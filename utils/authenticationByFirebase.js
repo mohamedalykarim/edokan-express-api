@@ -26,7 +26,8 @@ exports.authenticationByFirebase = async (req) => {
                 reject("Token verification failed");
                 return
             }else{
-                const uid = decodedToken.uid;            
+                const uid = decodedToken.uid.user_id; 
+                           
                 resolve(uid)
                 return
             }
@@ -67,7 +68,8 @@ exports.authenticationRequestByFirebase = async (req, res, next) => {
   
       // Attach user info to the request object for further use
       req.user = decodedToken;
-      next(); // Proceed to the next middleware (i.e., file upload)
+
+      next(); 
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Internal server error', error: error.message });

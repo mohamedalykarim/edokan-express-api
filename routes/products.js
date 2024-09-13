@@ -10,22 +10,53 @@ const authenticationRequestByFirebase = require('../utils/authenticationByFireba
 
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
 
 let connection
 
 
+let index = 0
+let name = ""
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, 'uploads/images/products/');
+        const folderPath = path.resolve('uploads/temp/'+req.user.user_id);
+        // Check if the folder exists
+        if (!fs.existsSync(folderPath)) {
+            // Create the folder if it does not exist
+            fs.mkdirSync(folderPath, { recursive: true });
+            console.log("folder not exist");
+            
+            cb(null, 'uploads/temp/'+req.user.user_id);
+        }else{
+            console.log("folder exist");
+
+            cb(null, 'uploads/temp/'+req.user.user_id);
+        }
     },
     filename: function (req, file, cb) {
-      cb(null, file.originalname); 
+        if(index === 0){
+            name = "thumbnail"
+        }else if(index === 1){
+            name = "image1"
+        }else if(index === 2){
+            name = "image2"
+        }else if(index === 3){
+            name = "image3"
+        }else if(index === 4){
+            name = "image4"
+        }
+
+        const extension = path.extname(file.originalname); // Get the file extension
+
+        
+        cb(null, name + extension); 
+        index++
     }
   });
 
-  const fileFilter = (req, file, cb) => {
-    console.log(file.mimetype);
-    
+  const fileFilter = (req, file, cb) => {    
     if (file.mimetype === 'image/jpeg' || file.mimetype === 'image/png' || 'image/*') {
       cb(null, true); // Accept file
     } else {
@@ -47,10 +78,7 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
         return res.status(500).json({ message: 'No files uploaded' });
     }
 
-    
-
-    const imageUrls = req.files.map(file => `/uploads/${file.filename}`);
-    console.log(imageUrls);
+    const user = req.user
     
     try {
         connection = await pool.getConnection();
@@ -69,39 +97,47 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
             marketplace_name,
             marketplace_lat,
             marketplace_lng,
+            product_owner_id,
             date_added,
             date_modified,
         } = req.body;
 
+        if(product_owner_id.replace(/^"(.*)"$/, '$1') !== user.user_id){
+            return res.status(500).json({
+                message: "Unauthorized: wrong product owner id",
+                result: null,
+            });
+        }
+
         // Parse the request body to get the marketplace data
         const product = {
-            product_name : product_name,
-            product_description:   product_description,
-            product_price: product_price,
-            product_quantity: product_quantity, 
-            product_width: product_width,
-            product_height: product_height,
-            product_weight: product_weight,
-            product_length: product_length,
-            product_discount: product_discount,
-            marketplace_id: marketplace_id,
-            marketplace_name: marketplace_name,
-            marketplace_lat: marketplace_lat,
-            marketplace_lng: marketplace_lng,
-            product_owner_id: uid,
-            date_added: date_added,
-            date_modified: date_modified,
+            product_name: product_name.replace(/^"(.*)"$/, '$1'),
+            product_description: product_description.replace(/^"(.*)"$/, '$1'),
+            product_price: parseFloat(product_price),  
+            product_quantity: parseFloat(product_quantity),  
+            product_width: parseFloat(product_width),  
+            product_height: parseFloat(product_height),  
+            product_weight: parseFloat(product_weight),  
+            product_length: parseFloat(product_length),  
+            product_discount: parseFloat(product_discount),  
+            marketplace_id: parseInt(marketplace_id),  
+            marketplace_name: marketplace_name.replace(/^"(.*)"$/, '$1'),  
+            marketplace_lat: parseFloat(marketplace_lat),  
+            marketplace_lng: parseFloat(marketplace_lng), 
+            product_owner_id: user.user_id,
+            date_added: parseFloat(date_added),  // Parse date as float (Unix timestamp)
+            date_modified: parseFloat(date_modified)  // Parse modified date as float
         };
 
+
         // Validate the parsed body
-        const validationErrors = validateProductBody(body);
+        const validationErrors = validateProductBody(product);
         if (validationErrors.length > 0) {
             return res.status(500).json({
                 message: validationErrors[0],
                 result: null,
             })
-        }
-
+        }        
 
 
         const marketplace = await marketplacesQueries.getMarketplacesById(connection, product.marketplace_id)
@@ -112,25 +148,48 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
                 result: null,
             })
         }
+        
+        // Ensure that the `marketplace_owner_id` matches the authenticated user
+        if (marketplace.marketplace_owner_id !== user.user_id) {
+            return res.status(500).json({
+                message: "Unauthorized: wrong marketplace owner id " + "marketplace_owner_id :",
+                result: null,
+            });
+        }  
 
+        product['marketplace_name'] = product.marketplace_name.replace(/\"/g, "")
 
 
         // Ensure that the `marketplace_owner_id` matches the authenticated user
-        if (marketplace.marketplace_owner_id !== uid || 
-            marketplace.marketplace_name !== product.marketplace_name || 
-            marketplace.lat !== product.marketplace_lat ||
-            marketplace.lng !== product.marketplace_lng
-        ) {
+        if (marketplace.marketplace_name !== product.marketplace_name) {
             return res.status(500).json({
-                message: "Unauthorized: Error on product data that required adding",
+                message: "Unauthorized: Marketplace error" + " "+marketplace.marketplace_name + " "+product.marketplace_name,
                 result: null,
             });
-        }        
+        }  
+
+        
+
+        // Ensure that the `marketplace_owner_id` matches the authenticated user
+        if (marketplace.lat !== product.marketplace_lat ) {
+            return res.status(500).json({
+                message: "Unauthorized: Latitude error",
+                result: null,
+            });
+        }  
+
+        // Ensure that the `marketplace_owner_id` matches the authenticated user
+        if (marketplace.lng !== product.marketplace_lng) {
+            return res.status(500).json({
+                message: "Unauthorized: Longitude error",
+                result: null,
+            });
+        }  
 
        
 
         // Add the new marketplace to the database
-        const result = await productQueries.addNewProduct(connection, product, files);
+        const result = await productQueries.addNewProduct(connection, product);
 
         if(result.result !== true){
             return res.status(500).json({
@@ -138,13 +197,18 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
                 result: null,
             })
         }else{
+            const insertedProductId = result.insertId;
+            console.log(insertedProductId);
+            
+            await changeFilesDestionation(insertedProductId, fs, req.files, user.user_id);
 
+            return res.status(200).json({
+                message: "Product is added Successfuly",
+                result: true
+            });
         }
 
-        return res.status(200).json({
-            message: "Product is added Successfuly",
-            result
-        });
+        
 
     } catch (error) {
         return res.status(500).json({
@@ -157,6 +221,34 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
         }
     }
 })
+
+const changeFilesDestionation= async(insertedProductId, fs, files, user_id) =>{
+    return new Promise(async (resolve, reject) => {
+        const finalProductFolder = path.resolve(`public/images/products/${insertedProductId}`);
+    if (!fs.existsSync(finalProductFolder)) {
+        // Create the folder if it does not exist
+        fs.mkdirSync(finalProductFolder, { recursive: true });
+    }
+
+    // Move the uploaded images from temp to the final folder
+    for (const file of files) {
+        const tempFilePath = path.resolve(`uploads/temp/${user_id}/${file.filename}`);
+        const finalFilePath = path.resolve(`${finalProductFolder}/${file.filename}`);
+        console.log(tempFilePath);
+        console.log(finalFilePath);
+
+        try {
+            await fs.rename(tempFilePath, finalFilePath, (err) => reject(err));
+        } catch (error) {           
+            reject(error.message)
+        }
+        
+    }
+
+    resolve(true)
+
+    });
+} 
 
 
 function validateProductBody(body) {
@@ -171,15 +263,11 @@ function validateProductBody(body) {
         errors.push("Product description is missing or invalid");
     }
 
-    if (!body.product_price || isNaN(parseFloat(body.product_price.replace(",", ".")))) {
+    if (!body.product_price || isNaN(body.product_price)) {
         errors.push("Product price is missing or invalid");
     }
 
-    if (!body.product_quantity || isNaN(parseFloat(body.product_quantity.replace(",", ".")))) {
-        errors.push("Product quantity is missing or invalid");
-    }
-
-    if (!body.marketplace_id || isNaN(parseInt(body.marketplace_id))) {
+    if (!body.marketplace_id || isNaN(body.marketplace_id)) {
         errors.push("Marketplace ID is missing or invalid");
     }
 
@@ -188,11 +276,11 @@ function validateProductBody(body) {
     }
 
     // Add more checks for other fields (like latitude, longitude, dates, etc.)
-    if (!body.marketplace_lat || isNaN(parseFloat(body.marketplace_lat.replace(",", ".")))) {
+    if (!body.marketplace_lat || isNaN(body.marketplace_lat)) {
         errors.push("Marketplace latitude is missing or invalid");
     }
 
-    if (!body.marketplace_lng || isNaN(parseFloat(body.marketplace_lng.replace(",", ".")))) {
+    if (!body.marketplace_lng || isNaN(body.marketplace_lng)) {
         errors.push("Marketplace longitude is missing or invalid");
     }
 

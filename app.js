@@ -31,6 +31,9 @@ const categoriesRoute = require('./routes/categories');
 app.use("/categories/", categoriesRoute);
 
 
+app.use('/public', express.static(path.join(__dirname, 'public/')));
+
+
 
 app.use((req, res, next)=>{
     const error = new Error("Not found");

@@ -21,11 +21,11 @@ exports.getProductById = (connection, id) => {
     });
 };
 
-exports.addNewProduct = (connection, product, files) => {
+exports.addNewProduct = (connection, product) => {
     return new Promise(async(resolve, reject) => {
         try {
 
-            const query = "INSERT INTO `products` (`product_name`, `product_description`, `product_price`, `product_quantity`, `product_width`, `product_height`, `product_weight`, `product_length`, `product_discount`, `marketplace_id`, `marketplace_name`, `marketplace_lat`, `marketplace_lng`, `product_status`, `is_global`, `product_owner_id`, `date_added`, `date_modified`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+            const query = "INSERT INTO products (product_name, product_description, product_price, product_quantity, product_width, product_height, product_weight, product_length, product_discount, marketplace_id, marketplace_name, marketplace_lat, marketplace_lng, product_status, is_global, product_owner_id, date_added, date_modified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
             const values = [
                 product.product_name,
@@ -54,7 +54,7 @@ exports.addNewProduct = (connection, product, files) => {
                 const insertId = result[0]["insertId"]
                 resolve({
                     result : true, 
-                    data: insertId
+                    insertId: insertId
                 });
             }else{
                 reject("Error: Can't add Product");
