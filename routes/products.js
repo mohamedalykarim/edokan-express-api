@@ -63,12 +63,9 @@ const storage = multer.diskStorage({
         if (!fs.existsSync(folderPath)) {
             // Create the folder if it does not exist
             fs.mkdirSync(folderPath, { recursive: true });
-            console.log("folder not exist");
             
             cb(null, 'uploads/temp/'+req.user.user_id);
         }else{
-            console.log("folder exist");
-
             cb(null, 'uploads/temp/'+req.user.user_id);
         }
     },
@@ -248,9 +245,16 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
                 result: null,
             })
         }else{
-            const insertedProductId = result.insertId;        
+            const insertedProductId = result.insertId;   
+            
+            console.log("categories", req.body.categories);
+            
 
             const updateImagesResults = await productQueries.updateImagesResults(connection, insertedProductId, images)
+            const insertCategoriesResults = await productQueries.addNewProductCategories(connection, insertedProductId, req.body.categories)
+
+            index = 0
+            name = ""
             
             await changeFilesDestionation(insertedProductId, fs, req.files, user.user_id);
 
@@ -263,6 +267,8 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
         
 
     } catch (error) {
+        index = 0
+        name = ""
         return res.status(500).json({
             message: "Error: "+ error,
             result: null

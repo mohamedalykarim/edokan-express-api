@@ -146,6 +146,35 @@ exports.updateImagesResults = (connection, productId, images) => {
     });
 };
 
+exports.addNewProductCategories = (connection, productId, categoryIds) => {
+    return new Promise(async (resolve, reject) => {
+        let ids = []
+        if(categoryIds instanceof Array){
+            categoryIds.forEach(element => {
+                ids.push(element)
+            });
+        }else{
+            ids.push(categoryIds)
+        }
+        
+        try {
+            // Build the query dynamically for multiple category IDs
+            const query = `INSERT INTO product_categories (product_id, category_id) VALUES ${ids.map(() => '(?, ?)').join(', ')};`;
+
+            // Create the array of values to be inserted
+            const values = [];
+            ids.forEach(categoryId => {
+                values.push(productId, categoryId);
+            });
+
+            const result = await connection.query(query, values);
+            resolve(result[0]);
+        } catch (error) {
+            reject(error.message);
+        }
+    });
+};
+
 exports.uploadProductImages = (connection, productId, files) => {
     return new Promise(async (resolve, reject) => {
         try {
@@ -222,4 +251,7 @@ exports.uploadProductImages = (connection, productId, files) => {
         }
     });
 };
+
+
+
 
