@@ -5,7 +5,6 @@ const productQueries = require('../db/queries/productQueries');
 const marketplacesQueries = require('../db/queries/marketplaceQueries');
 
 const pool = require('../db/connection'); 
-const authenticationByFirebase = require('../utils/authenticationByFirebase').authenticationByFirebase
 const authenticationRequestByFirebase = require('../utils/authenticationByFirebase').authenticationRequestByFirebase
 
 const multer = require('multer');
@@ -18,6 +17,44 @@ let connection
 
 let index = 0
 let name = ""
+
+
+router.get('/get', authenticationRequestByFirebase,  async (req, res) => {
+    const { page, limit, search = '', marketplace_id } = req.query;        
+
+    // Convert page and limit to integers
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+    const marketplaceId = parseInt(marketplace_id);
+
+    // Calculate the offset for pagination
+    const offset = (pageNumber - 1) * limitNumber;
+
+    let connection;
+    try {
+        connection = await pool.getConnection();        
+
+        const products = await productQueries.getProductsPaging(connection, req.user.user_id, marketplaceId, search, limitNumber, offset )
+
+        // Respond with the products and pagination info
+        return res.status(200).json({
+            message: "Products retrieved successfully",
+            result: products
+        });
+
+    } catch (error) {
+        console.error('Error fetching products:', error);
+        return res.status(500).json({
+            message: 'Error fetching products',
+            error: error.message
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+});
+
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -48,7 +85,7 @@ const storage = multer.diskStorage({
             name = "image4"
         }
 
-        const extension = path.extname(file.originalname); // Get the file extension
+        const extension = path.extname(file.originalname);
 
         
         cb(null, name + extension); 
@@ -69,16 +106,24 @@ const storage = multer.diskStorage({
     fileFilter: fileFilter,
     limits: { fileSize: 2 * 1024 * 1024 }
   });
-  
-
 
 router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async (req, res, next)=>{
+    const images = req.files.map(file => `uploads/${file.filename}`);
 
-    if (!req.files || req.files.length === 0) {
-        return res.status(500).json({ message: 'No files uploaded' });
+    if(images.length > 5){
+        return res.status(500).json({
+            message: 'You can only upload up to 5 images',
+            result: null,
+        })
+    }else if(images.length < 1){
+        return res.status(500).json({
+            message: 'You must upload at least 1 image',
+            result: null,
+        })
     }
 
     const user = req.user
+
     
     try {
         connection = await pool.getConnection();
@@ -107,7 +152,8 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
                 message: "Unauthorized: wrong product owner id",
                 result: null,
             });
-        }
+        }    
+
 
         // Parse the request body to get the marketplace data
         const product = {
@@ -115,6 +161,11 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
             product_description: product_description.replace(/^"(.*)"$/, '$1'),
             product_price: parseFloat(product_price),  
             product_quantity: parseFloat(product_quantity),  
+            product_image_url : "",
+            product_image1_url : "",
+            product_image2_url : "",
+            product_image3_url : "",
+            product_image4_url : "",
             product_width: parseFloat(product_width),  
             product_height: parseFloat(product_height),  
             product_weight: parseFloat(product_weight),  
@@ -197,8 +248,9 @@ router.post("/", authenticationRequestByFirebase,  upload.array('files'),  async
                 result: null,
             })
         }else{
-            const insertedProductId = result.insertId;
-            console.log(insertedProductId);
+            const insertedProductId = result.insertId;        
+
+            const updateImagesResults = await productQueries.updateImagesResults(connection, insertedProductId, images)
             
             await changeFilesDestionation(insertedProductId, fs, req.files, user.user_id);
 
@@ -234,8 +286,6 @@ const changeFilesDestionation= async(insertedProductId, fs, files, user_id) =>{
     for (const file of files) {
         const tempFilePath = path.resolve(`uploads/temp/${user_id}/${file.filename}`);
         const finalFilePath = path.resolve(`${finalProductFolder}/${file.filename}`);
-        console.log(tempFilePath);
-        console.log(finalFilePath);
 
         try {
             await fs.rename(tempFilePath, finalFilePath, (err) => reject(err));

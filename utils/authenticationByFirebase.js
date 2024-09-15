@@ -5,7 +5,7 @@ exports.authenticationByFirebase = async (req) => {
     return new Promise(async (resolve, reject) => {
         try {    
             // Extract the Firebase ID token from the request headers
-            const idToken = req.headers.Authorization || req.headers.authorization;
+            const idToken = req.headers.Authorization || req.headers.authorization;            
    
             if (!idToken) {
                 reject("Unauthorized: No token provided");
@@ -25,8 +25,8 @@ exports.authenticationByFirebase = async (req) => {
             if (!decodedToken) {
                 reject("Token verification failed");
                 return
-            }else{
-                const uid = decodedToken.uid.user_id; 
+            }else{              
+                const uid = decodedToken.uid; 
                            
                 resolve(uid)
                 return

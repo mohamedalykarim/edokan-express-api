@@ -21,15 +21,46 @@ exports.getProductById = (connection, id) => {
     });
 };
 
+exports.getProductsPaging = (connection, userId, marketplace_id, search, limit, offset) => {
+    return new Promise(async(resolve, reject) => {
+        try {
+            let query = `SELECT * FROM products WHERE product_owner_id = ? AND marketplace_id = ? LIMIT ? OFFSET ?`;
+            let values = [userId, marketplace_id, limit, offset]
+
+
+            if (search) {
+                search = ''
+                query = `SELECT * FROM products WHERE product_name LIKE ? AND product_owner_id = ? AND marketplace_id = ? LIMIT ? OFFSET ?`;
+                values = [`%${search}%`, userId, marketplace_id, limit, offset]
+            }
+
+            // query = "SELECT * FROM products"
+            const results = await connection.query(query, values);
+
+            console.log(results[0]);
+            
+
+            resolve(results[0]);
+        } catch (error) {
+            reject(error.message);
+        }
+    });
+};
+
 exports.addNewProduct = (connection, product) => {
     return new Promise(async(resolve, reject) => {
         try {
 
-            const query = "INSERT INTO products (product_name, product_description, product_price, product_quantity, product_width, product_height, product_weight, product_length, product_discount, marketplace_id, marketplace_name, marketplace_lat, marketplace_lng, product_status, is_global, product_owner_id, date_added, date_modified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+            const query = "INSERT INTO products (product_name, product_description, product_image_url, product_image1_url, product_image2_url, product_image3_url, product_image4_url, product_price, product_quantity, product_width, product_height, product_weight, product_length, product_discount, marketplace_id, marketplace_name, marketplace_lat, marketplace_lng, product_status, is_global, product_owner_id, date_added, date_modified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 
             const values = [
                 product.product_name,
                 product.product_description,
+                product.product_image_url,
+                product.product_image1_url,
+                product.product_image2_url,
+                product.product_image3_url,
+                product.product_image4_url,
                 product.product_price,
                 product.product_quantity,
                 product.product_width,
@@ -62,6 +93,55 @@ exports.addNewProduct = (connection, product) => {
 
         } catch (error) {
             reject(error.message)
+        }
+    });
+};
+
+exports.updateImagesResults = (connection, productId, images) => {
+    return new Promise(async(resolve, reject) => {
+        try {
+
+            let imageUrls = []
+        
+            if(images.length === 1){
+                imageUrls.push(images[0].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push("")
+                imageUrls.push("")
+                imageUrls.push("")
+                imageUrls.push("")
+            }else if(images.length === 2){
+                imageUrls.push(images[0].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[1].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push("")
+                imageUrls.push("")
+                imageUrls.push("")
+            }else if(images.length === 3){
+                imageUrls.push(images[0].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[1].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[2].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push("")
+                imageUrls.push("")
+            }else if(images.length === 4){
+                imageUrls.push(images[0].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[1].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[2].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[3].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push("")
+            }else if(images.length === 5){
+                imageUrls.push(images[0].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[1].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[2].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[3].replace('uploads/', 'public/images/products/'+ productId +'/'))
+                imageUrls.push(images[4].replace('uploads/', 'public/images/products/'+ productId +'/'))
+            }
+
+
+            const query = `UPDATE products SET product_image_url = ?, product_image1_url = ?, product_image2_url = ?, product_image3_url = ?, product_image4_url = ? WHERE product_id = ?`;
+            const values = [imageUrls[0], imageUrls[1], imageUrls[2], imageUrls[3], imageUrls[4], productId];
+            const result = await connection.query(query, values);
+            resolve(result[0]);
+        } catch (error) {
+            reject(error.message);
         }
     });
 };

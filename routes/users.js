@@ -13,9 +13,11 @@ router.get("/", async(req, res, next)=>{
         connection = await pool.getConnection();
 
         const uid = await authenticationByFirebase(req);
+
+        
         
         // Retrieve user data from your database
-        const result = await userQueries.getUserById(connection, uid);
+        const result = await userQueries.getUserById(connection, uid);        
 
         if(result == undefined){
             return res.status(500).json({
@@ -32,6 +34,8 @@ router.get("/", async(req, res, next)=>{
 
 
     } catch (error) {
+        console.log(error);
+        
         return res.status(500).json({
             message: "Error: "+ error,
             result: null
@@ -48,8 +52,6 @@ router.post("/", async(req, res, next)=>{
 
     try {
         connection = await pool.getConnection();
-
-        console.log("body");
 
         const userId = await authenticationByFirebase(req);  
 
