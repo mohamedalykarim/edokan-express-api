@@ -24,20 +24,14 @@ exports.getProductById = (connection, id) => {
 exports.getProductsPaging = (connection, userId, marketplace_id, search, limit, offset) => {
     return new Promise(async(resolve, reject) => {
         try {
-            let query = `SELECT * FROM products WHERE product_owner_id = ? AND marketplace_id = ? LIMIT ? OFFSET ?`;
-            let values = [userId, marketplace_id, limit, offset]
+            query = `SELECT * FROM products WHERE product_name LIKE ? AND product_owner_id = ? AND marketplace_id = ? LIMIT ? OFFSET ?`;
+            let values = [`%${search}%`, userId, marketplace_id, limit, offset]
 
-
-            if (search) {
-                search = ''
-                query = `SELECT * FROM products WHERE product_name LIKE ? AND product_owner_id = ? AND marketplace_id = ? LIMIT ? OFFSET ?`;
-                values = [`%${search}%`, userId, marketplace_id, limit, offset]
-            }
 
             // query = "SELECT * FROM products"
             const results = await connection.query(query, values);
-
-            console.log(results[0]);
+            
+            console.log("result length :",results[0].length);
             
 
             resolve(results[0]);
